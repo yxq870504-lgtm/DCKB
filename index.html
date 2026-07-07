@@ -1,0 +1,339 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>快乐减脂趋势看板</title>
+<script src="./assets/chart.umd.min.js"></script>
+<style>
+:root{
+ /* 色板 · 清新草绿终版(近白底大留白,绿只做正反馈点缀,见 docs/DESIGN-SYSTEM.md) */
+ --bg:#FAFCFA;--card:#FFFFFF;--ink:#28382E;--t2:#5C7265;--t3:#74877B;--line:#EAF2EC;
+ --accent:#16A34A;--accent-d:#15803D;--accent-l:#22C55E;--soft:#E7F5EC;--warn:#B5651D;
+ --pos:#15803D;--pos-d:#15803D;--pos-soft:#E3F3E9;          /* 正向反馈:掉秤/达标/训练日 */
+ --weak:#D7EDDE;--line2:#0D9488;--praise:#F1FAF4;
+ --shadow:0 2px 12px rgba(70,60,45,.08);
+ /* 状态色:日历格子 & 活动 chip —— 全部集中一处,杜绝撞色 */
+ --cell:#F7FAF7;--cell-today:#FFFFFF;
+ --chip-train:var(--pos-soft);--chip-train-t:var(--pos-d);
+ --chip-cardio:#DFF1EE;--chip-cardio-t:#0B7468;
+ --chip-rest:#EFF3EF;--chip-rest-t:var(--t3);
+ --chip-other:#ECF1EC;--chip-other-t:var(--t2);
+ /* 间距刻度 / 圆角(组件统一引用) */
+ --s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;
+ --r:16px;--r-sm:12px;
+}
+*{box-sizing:border-box}
+html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+body{margin:0;background:var(--bg);color:var(--ink);
+ font:15px/1.65 'Nunito Sans','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+ font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;letter-spacing:.005em;}
+h1,.stat .v,.hero .answer,.sf-item b,.node .flag{font-family:'Varela Round','Nunito Sans','PingFang SC','Hiragino Sans GB',sans-serif;}
+.wrap{max-width:540px;margin:0 auto;padding:30px 18px 80px;}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:22px;margin-bottom:16px;
+ animation:rise .5s cubic-bezier(.2,.7,.2,1) both;}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.card{animation:none}}
+/* 英雄卡:整页第一眼焦点(问句+答案+今日体重大数字) */
+.hero .upd{font-size:11px;color:var(--t3);letter-spacing:.04em;margin-bottom:8px;}
+.hero h1{font-size:21px;font-weight:700;letter-spacing:-.01em;margin:0;}
+.hero .answer{font-size:28px;font-weight:700;color:var(--accent-d);margin:2px 0 16px;letter-spacing:-.01em;}
+.msbar{position:relative;margin:56px 24px 4px;}
+.track2{position:relative;height:8px;background:var(--weak);border-radius:8px;}
+.fill2{position:absolute;left:0;top:0;height:100%;background:linear-gradient(90deg,var(--accent-l),var(--accent-d));border-radius:8px;}
+.here{position:absolute;top:4px;width:13px;height:13px;border-radius:50%;background:#fff;border:3px solid var(--accent);box-shadow:0 1px 4px rgba(40,56,46,.22);transform:translate(-50%,-50%);z-index:4;}
+.here b{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;color:var(--accent-d);white-space:nowrap;}
+.node{position:absolute;top:4px;z-index:2;}
+.node .pole{position:absolute;left:0;top:-22px;width:2px;height:22px;background:var(--weak);transform:translateX(-50%);border-radius:2px;}
+.node .flag{position:absolute;left:0;top:-45px;transform:translateX(-50%);min-width:34px;height:25px;padding:0 9px;
+ display:flex;align-items:baseline;justify-content:center;gap:1px;border-radius:8px;background:#fff;border:1.5px solid var(--weak);
+ color:var(--t2);font-size:14px;font-weight:700;box-shadow:0 2px 5px rgba(40,56,46,.08);}
+.node .flag i{font-style:normal;font-size:9px;font-weight:600;color:var(--t3);}
+.node .nl{position:absolute;top:24px;left:0;transform:translateX(-50%);font-size:10.5px;color:var(--t3);white-space:nowrap;}
+.node.done .flag{background:var(--pos);border-color:var(--pos);color:#fff;} .node.done .flag i{color:#D3E8DA;}
+.node.done .pole{background:var(--pos);} .node.done .nl{color:var(--pos-d);}
+.node.now .flag{border-color:var(--accent);border-width:2px;color:var(--accent-d);box-shadow:0 0 0 4px var(--soft),0 2px 5px rgba(40,56,46,.08);}
+.node.now .flag i{color:var(--accent-d);} .node.now .pole{background:var(--accent);} .node.now .nl{color:var(--accent-d);font-weight:700;}
+.node.start .flag{background:#F2F6F2;border-color:var(--weak);color:var(--t2);} .node.start .flag i{color:var(--t3);}
+.node.start .pole{background:var(--weak);} .node.start .nl{color:var(--t3);}
+/* 首尾节点贴边对齐，避免旗子/文字飘到卡片外 */
+.node.start .flag,.node.start .nl{transform:translateX(0);left:-2px;}
+.node.end .flag,.node.end .nl{transform:translateX(-100%);left:2px;}
+@media(max-width:600px){
+ .msbar{margin:52px 16px 4px;}
+ .node .flag{min-width:30px;height:23px;padding:0 7px;font-size:13px;}
+ .node .nl{font-size:10px;}
+ .here b{font-size:10px;}
+}
+.tip-t{font-size:15px;font-weight:650;color:var(--ink);margin-bottom:5px;}
+.tip-b{font-size:14.5px;line-height:1.7;color:var(--t2);}  /* 与 .body-t 同刻度:同级卡片正文必须同字号 */
+.speed{margin-top:11px;font-size:13.5px;line-height:1.65;color:var(--t2);padding-left:12px;border-left:2px solid var(--soft);}
+/* 里程碑进度条下的点评:给旗标下方标签让出空间;在大卡里属主要内容,字号用正文级(双类压过紧凑块覆写) */
+.speed.msnote{margin-top:38px;font-size:14.5px;line-height:1.7;}
+/* 字号刻度约定:正文级(body-t/tip-b/judge2)14.5 · 结论行(one)15 · 次级说明(coach/advice2/speed)13.5 · 提示(note)12.5 */
+/* Bento 三段式(分享视图):默认(窄屏)容器透明化、卡片单列竖排;≥1360px 进入便当盒布局——
+   R1 英雄卡|里程碑 → R2 趋势大图|夸夸+身体成分 → R3 饮食|7天趋势|日历+小结。
+   各格末卡弹性补高 → 每段底边恒对齐,整页截图即一张层级清晰的分享宽图。 */
+.b1,.b2,.b3,.bcell{display:contents;}
+@media(min-width:880px){
+ .wrap{max-width:1000px;}
+ .span2 .stats{gap:48px;}
+}
+@media(min-width:1360px){
+ .wrap{max-width:1680px;padding-left:28px;padding-right:28px;}
+ /* b1 与 b3 共用同一三列栅格:英雄卡占第1列、里程碑跨第2-3列,上下列边界严丝合缝 */
+ .b1{display:grid;grid-template-columns:29fr 45fr 26fr;gap:0 14px;align-items:stretch;}
+ .b1>.hero{grid-column:1;} .b1>.card:nth-child(2){grid-column:2 / 4;}
+ .b2{display:grid;grid-template-columns:6fr 6fr;gap:0 14px;align-items:stretch;}
+ .b3{display:grid;grid-template-columns:29fr 45fr 26fr;gap:0 14px;align-items:stretch;}
+ .bcell{display:flex;flex-direction:column;min-width:0;}
+ .bcell>.card:last-child{flex:1;}
+ /* .grow 卡(日历)吃掉该列富余高度,表格行随之等比撑开填满——保证三列底边对齐,且无中间白洞 */
+ .bcell>.card.grow{flex:1;display:flex;flex-direction:column;}
+ .bcell>.card.grow table.cal{flex:1;}
+ .bcell:has(>.card.grow)>.card:last-child:not(.grow){flex:0 0 auto;}
+ .trim-wide{display:none;}  /* 饮食卡弹性预算:一页视图下让位的低优先内容(手机滚动视图不受影响) */
+ .narrowdiet{min-height:0;}
+ .narrowdiet>.card.dietcard{min-height:0;overflow:hidden;}  /* 饮食卡锁到行高、超出裁切;由 fitDiet() 按实测高度决定收哪块 */
+ .b1>.card{display:flex;flex-direction:column;justify-content:center;}
+ .b1>.hero{justify-content:flex-start;}
+ .hero h1{font-size:23px;}
+ .hero .answer{font-size:31px;margin-bottom:8px;}
+ .hero .stat .v{font-size:42px;}
+ .hero .stat.ma .v{font-size:24px;}
+ .hero .stat.noweigh .v{font-size:24px;}
+ .cv{height:205px;}
+ /* 窄格里的饮食卡:内部改单列(双列会挤破) */
+ /* 饮食列加宽后内部恢复左右并排(餐清单|配额表),卡子高度减半 */
+ .narrowdiet .diet-grid{grid-template-columns:1.05fr 1fr;gap:16px;}
+ /* —— 一页视图密度:内容精炼后字号回大,层级靠英雄区撑,目标笔记本一屏透底 —— */
+ .wrap{padding-top:16px;padding-bottom:24px;}
+ .card{padding:15px 18px;margin-bottom:12px;}
+ .mt{margin-bottom:11px;}  /* 字号见基础 .mt(在后,生效) */
+ .coach{margin-top:10px;padding:8px 12px;font-size:15px;line-height:1.6;}
+ .pstrip{margin-top:9px;font-size:15px;line-height:1.6;padding-left:12px;}
+ .speed{margin-top:9px;font-size:13.5px;line-height:1.6;}
+ .one{font-size:17px;}
+ .stats{margin-bottom:11px;gap:26px;}
+ .msbar{margin:50px 20px 2px;}
+ .kv{margin-top:9px;} .kv .row{padding:5px 0;font-size:15px;}  /* 三行上下排,标签恒对齐 */
+ .kv .k{font-size:13px;}
+ .range{margin-bottom:5px;}
+ .cv.sm{height:96px;}
+ /* 同列多图均衡伸缩:带 chartgrow 的卡平分该格富余高度,各自图表随卡长高(谁也不独吞留白) */
+ .bcell>.card.chartgrow{display:flex;flex-direction:column;flex:1 1 auto;}
+ .card.chartgrow .cv{flex:1 1 auto;height:auto;min-height:84px;}
+ .card.chartgrow .cv:not(.sm){min-height:185px;}
+ .body-t{font-size:16px;line-height:1.62;}
+ .tip-t{font-size:16.5px;margin-bottom:4px;} .tip-b{font-size:16px;line-height:1.62;}
+ .pz-big{font-size:18.5px;line-height:1.55;margin-top:8px;}
+ .judge2{margin-top:10px;font-size:14.5px;line-height:1.62;} .advice2{margin-top:8px;font-size:13.5px;line-height:1.58;}
+ .diet-grid{gap:16px;}
+ .diary{gap:8px;}
+ .meal{padding:8px 11px;gap:10px;}
+ .mtile{width:36px;height:36px;font-size:18px;border-radius:9px;} .mthumb{width:38px;height:38px;border-radius:9px;}
+ .mn{margin-bottom:2px;font-size:12px;} .mfi{font-size:16px;} .mlist{line-height:1.5;} .mnut{margin-top:3px;font-size:12.5px;}
+ .macro{margin-top:10px;padding:9px 12px;} .mr{padding:3px 0;} .mv{font-size:17px;} .mk{font-size:14.5px;}
+ .ms{font-size:12.5px;}
+ .diet-right{padding:12px 14px;} .sf-strip{gap:9px;} .sf-item b{font-size:21px;} .sf-item .sk{font-size:13.5px;}
+ table.cal{border-spacing:3px;} table.cal td{height:32px;padding:3px 4px;border-radius:7px;}
+ .dn{font-size:10px;} .chip{font-size:9.5px;padding:1.5px 5px;margin-top:2px;line-height:1.5;}
+ .note{padding:9px 12px;font-size:12.5px;line-height:1.6;}
+ .foot{margin-top:9px;}
+}
+.mt{font-size:17px;font-weight:700;color:var(--ink);letter-spacing:.01em;margin:0 0 16px;}
+/* 今日状态 */
+.stats{display:flex;align-items:flex-end;gap:30px;margin-bottom:14px;}
+.stat .l{font-size:11px;color:var(--t3);letter-spacing:.03em;margin-bottom:8px;}
+.stat .v{font-size:34px;font-weight:680;line-height:.9;letter-spacing:-.02em;}
+.stat .v .u{font-size:13px;font-weight:500;color:var(--t3);margin-left:3px;}
+.stat.ma .v{font-size:22px;font-weight:600;color:var(--accent);}
+.stat.noweigh .v{font-size:22px;font-weight:500;color:var(--t3);letter-spacing:.05em;}  /* 没称重的占位"--":小号、灰、细,不抢视野,与7日均同字号对齐 */
+.stat.tr{margin-left:auto;text-align:right;}
+.tag{display:inline-block;background:var(--pos);color:#fff;border-radius:99px;padding:4px 12px;font-size:12px;font-weight:600;}
+.one{font-size:16.5px;line-height:1.55;color:var(--t2);}
+/* 体重三行 */
+.kv{margin-top:14px;}
+.kv .row{display:flex;align-items:baseline;gap:14px;padding:9px 0;border-top:1px solid var(--line);font-size:14px;}
+.kv .row:first-child{border-top:none;padding-top:2px;}
+.kv .k{color:var(--t3);font-size:12px;letter-spacing:.04em;width:56px;flex:none;}
+.cv{position:relative;height:220px;margin:6px 0 2px;} .cv.sm{height:150px;}
+.range{display:flex;gap:8px;margin-bottom:8px;}
+.range button{background:transparent;border:1px solid var(--line);color:var(--t3);border-radius:8px;padding:4px 12px;font-size:12px;cursor:pointer;
+ transition:border-color .2s ease-out,color .2s ease-out;}
+.range button:hover{border-color:var(--accent);color:var(--accent-d);}
+.range button.on{background:var(--accent-d);color:#fff;border-color:var(--accent-d);}
+.sub{font-size:11px;color:var(--t3);font-weight:600;letter-spacing:.13em;text-transform:uppercase;margin:20px 0 10px;}
+/* 饮食日记 · 2×2 方格 */
+.diet-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:stretch;}
+/* 右侧"截至目前"拉伸填满列高,营养行均匀分布,底边与左侧餐卡齐平(不再上下留白) */
+.diet-right{display:flex;flex-direction:column;}
+.diet-right .sf-strip{flex:1;justify-content:space-between;}
+@media(max-width:600px){.diet-grid{grid-template-columns:1fr;gap:16px;}}
+.diary{display:flex;flex-direction:column;gap:10px;}
+.meal{display:flex;gap:11px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:13px;background:#FBFDFB;}
+.mvis{flex:none;}
+.mtile{width:50px;height:50px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:25px;
+ background:linear-gradient(135deg,#F2F8F3,#EAF4EC);border:1px solid #E2EEE5;}
+.mthumb{width:54px;height:54px;border-radius:13px;object-fit:cover;border:1px solid var(--line);
+ filter:saturate(1.05) contrast(1.02);display:block;}
+.mbody{min-width:0;flex:1;}
+.mn{font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:4px;}
+.mlist{line-height:1.6;}
+.mfi{font-size:14px;font-weight:600;}
+.sep{color:var(--t3);opacity:.55;margin:0 7px;font-weight:400;}
+.mnut{font-size:11px;color:var(--t3);margin-top:5px;}
+.meal.empty{background:#F7FAF7;} .meal.empty .mtile{opacity:.5;} .meal.empty .mbody{opacity:.6;}
+.mf-empty{font-size:14px;color:var(--t3);}
+.praise-card{background:var(--praise);border:1.5px solid var(--accent);position:relative;overflow:hidden;}
+.praise-card .pz-deco{position:absolute;right:8px;top:-6px;font-size:50px;opacity:.22;transform:rotate(8deg);pointer-events:none;}
+.pz-h{position:relative;font-size:11.5px;font-weight:800;letter-spacing:.1em;color:var(--accent-d);}
+.pz-big{position:relative;font-size:17px;line-height:1.62;font-weight:650;color:#2C4A36;margin-top:10px;}
+/* 三大营养素达标 */
+.macro{margin-top:16px;border:1px solid var(--line);border-radius:12px;padding:13px 15px;background:#FBFDFB;}
+.mttl{font-size:11px;color:var(--t3);letter-spacing:.06em;margin-bottom:9px;}
+.mr{display:grid;grid-template-columns:48px 1fr auto;align-items:baseline;gap:10px;padding:5px 0;}
+.mk{color:var(--t2);font-size:13px;}
+.mv{font-size:16px;font-weight:650;letter-spacing:-.01em;} .mv .sl{font-size:12px;font-weight:400;color:var(--t3);margin-left:5px;}
+.ms{font-size:12px;font-weight:600;justify-self:end;}
+.ms.ok{color:var(--pos);} .ms.low{color:var(--t3);} .ms.warn{color:var(--warn);}
+.note{padding:14px;background:#F7FAF7;border:1px dashed var(--weak);border-radius:12px;font-size:12.5px;color:var(--t3);line-height:1.7;}
+.body-t{font-size:16px;line-height:1.7;color:var(--t2);}
+.coach{margin-top:14px;background:#F6FAF7;border:1px solid #E4EFE7;border-radius:12px;padding:11px 14px;font-size:15px;line-height:1.72;color:var(--t2);}
+.pstrip{margin-top:11px;font-size:15px;line-height:1.72;color:var(--t2);padding-left:14px;}  /* 这一餐/下一餐:无底色文字行,左缩进对齐点评框内文字 */
+.ptag{font-weight:700;color:var(--ink);margin-right:7px;}  /* 小标题:仅加粗,不加底色 */
+.coach-tag{display:inline-block;font-size:14px;font-weight:700;color:var(--accent-d);background:var(--pos-soft);padding:3px 10px;border-radius:7px;margin-right:8px;letter-spacing:.02em;}
+/* 饮食 · 截至目前(横向铺平) */
+.diet-right{padding:14px 16px;background:#FBFDFB;border:1px solid var(--line);border-radius:13px;}
+.sf-h{font-size:11px;color:var(--t3);font-weight:600;letter-spacing:.13em;text-transform:uppercase;margin:0 0 12px;}
+.sf-strip{display:flex;flex-direction:column;gap:13px;}
+.sf-row{display:flex;flex-direction:column;gap:6px;}
+.sf-item{display:flex;align-items:baseline;gap:5px;}
+/* 碳蛋脂进度条:浅轨 + 目标区间两刻度 + 实际填充(按达标色) */
+.sf-bar{position:relative;height:7px;background:#EAF2EC;border-radius:6px;}
+.sf-fill{position:absolute;left:0;top:0;height:100%;border-radius:6px;background:var(--pos);transition:width .3s ease-out;}
+.sf-fill.warn{background:var(--warn);}  /* 超上限才换色(橙·警示);未达下限沿用默认绿,靠刻度线+文字区分 */
+.sf-tick{position:absolute;top:-2px;width:2px;height:11px;background:var(--accent-d);border-radius:1px;transform:translateX(-1px);opacity:.5;}
+.sf-item .sk{font-size:12px;color:var(--t3);}
+.sf-item b{font-size:21px;font-weight:700;letter-spacing:-.01em;}
+.sf-item i{font-size:11px;color:var(--t3);font-style:normal;}
+.sf-item em{font-size:11px;font-weight:600;font-style:normal;margin-left:1px;}
+.sf-item em.ok{color:var(--pos);} .sf-item em.mut{color:var(--t3);} .sf-item em.warn{color:var(--warn);}
+.judge2{margin-top:15px;font-size:14.5px;line-height:1.7;color:var(--ink);}
+.advice2{margin-top:11px;font-size:13.5px;line-height:1.65;color:var(--t2);}
+.advice2.full{background:#F6FAF7;border:1px solid #E4EFE7;border-radius:12px;padding:9px 14px;}  /* 下一餐:整行长条 */
+.jt{display:inline-block;font-size:11px;font-weight:700;color:var(--accent-d);background:var(--soft);padding:2px 8px;border-radius:6px;margin-right:8px;}
+/* 日历 */
+table.cal{width:100%;border-collapse:separate;border-spacing:4px;}
+table.cal th{color:var(--t3);font-weight:500;padding:0 0 6px;font-size:10px;}
+table.cal td{background:var(--cell);border-radius:9px;height:50px;vertical-align:top;padding:5px;width:14.28%;}
+table.cal td.e{background:transparent;}
+table.cal td.td{background:var(--cell-today);box-shadow:inset 0 0 0 1.5px var(--accent);}
+.dn{font-size:10px;color:var(--t3);}
+.chip{display:block;font-size:9.5px;padding:1px 4px;border-radius:5px;margin-top:2px;line-height:1.5;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.c-a{background:var(--chip-train);color:var(--chip-train-t);} .c-b{background:var(--chip-cardio);color:var(--chip-cardio-t);}
+.c-r{background:var(--chip-rest);color:var(--chip-rest-t);} .c-o{background:var(--chip-other);color:var(--chip-other-t);}
+.foot{text-align:center;color:var(--t3);font-size:10px;letter-spacing:.05em;margin-top:22px;}
+</style></head><body><div class="wrap">
+
+<div class='b1'><div class='card hero'><div class='upd'>更新至 2026-07-07 03:51</div><h1>羊羊羊今天减肥成功了没？</h1><div class='answer'>还没有～</div><div class='stats'><div class='stat '><div class='l'>今日体重</div><div class='v'>67.3<span class='u'>kg</span></div></div><div class='stat ma'><div class='l'>7 日均重</div><div class='v'>67.9<span class='u'>kg</span></div></div><div class='stat tr'><div class='l'>趋势</div><span class='tag'>明显下降</span></div></div><div class='one'>趋势还在往下，今天不用调整。</div></div><div class='card span2'><div class='mt'>里程碑 · 三个目标</div><div class='msbar'><div class='track2'><div class='fill2' style='width:11.2%'></div><div class='here' style='left:11.2%'><b>当前 67.9</b></div><div class='node start' style='left:0%'><div class='flag'>68<i>kg</i></div><div class='pole'></div><div class='nl'>起点</div></div><div class='node now' style='left:43.8%'><div class='flag'>65<i>kg</i></div><div class='pole'></div><div class='nl'>第一目标</div></div><div class='node ' style='left:66.3%'><div class='flag'>63<i>kg</i></div><div class='pole'></div><div class='nl'>第二目标</div></div><div class='node end' style='left:100.0%'><div class='flag'>60<i>kg</i></div><div class='pole'></div><div class='nl'>第三目标</div></div></div></div><div class='speed msnote'>最近减重速度约 1.55 kg/周（每两周约降 4.6%）。按松松的框架这偏快了——两周降超 3% 缺口太大、容易掉肌肉，建议小幅加点碳水，别太猛。</div></div></div><div class='b3'><div class='bcell'><div class='card chartgrow'><div class='mt'>体重趋势</div><div class='range' id='range'></div><div class='cv'><canvas id='cWeight' role='img' aria-label='体重趋势:单日散点(弱化)与7日均线(主线)'></canvas></div><div class='kv trim-wide'><div class='row'><span class='k'>今日变化</span><span>较前次 -0.7 kg，正常波动</span></div><div class='row'><span class='k'>可能原因</span><span>日常水分波动</span></div><div class='row'><span class='k'>是否调整</span><span>降得偏快，补够蛋白、睡好</span></div></div><div class='coach '><span class='coach-tag'>松松点评</span>松松看体重只看 1–2 周趋势、不看单日。你 7 日均稳稳向下、没到平台，按现在的节奏走就好。</div></div><div class='card chartgrow'><div class='mt'>身体成分</div><div class='body-t'>体脂率数据还不够，积累 2–4 周再看。体脂秤只看长期趋势，不看单日。</div><div class='coach trim-wide'><span class='coach-tag'>松松点评</span>松松说家用体脂秤只看 2–4 周趋势、不看单日（单日受水分/进食影响极大）。数据攒够 2–4 周再看减重质量。</div></div></div><div class='bcell narrowdiet'><div class='card dietcard span2'><div class='mt'>饮食 · 今日吃饭小日记 🍱</div><div class='diet-grid'><div class='diet-left'><div class='diary'><div class='meal'><div class='mvis'><div class='mtile'>🥣</div></div><div class='mbody'><div class='mn'>早餐</div><div class='mlist'><span class='mfi'>贝果面包混合碳水</span><span class='sep'>｜</span><span class='mfi'>速食鸡胸肉</span><span class='sep'>｜</span><span class='mfi'>香蕉</span></div><div class='mnut'>408 kcal · 碳水 74 · 蛋白 22.6 · 脂肪 3.8</div></div></div><div class='meal empty trim-wide'><div class='mvis'><div class='mtile'>🍚</div></div><div class='mbody'><div class='mn'>午餐</div><div class='mf-empty'>暂未记录</div></div></div><div class='meal empty trim-wide'><div class='mvis'><div class='mtile'>🍲</div></div><div class='mbody'><div class='mn'>晚餐</div><div class='mf-empty'>暂未记录</div></div></div></div></div><div class='diet-right'><div class='sf-h'>截至目前 · 休息日配额区间</div><div class='sf-strip'><div class='sf-item'><span class='sk'>热量</span><b>408</b><i>kcal</i></div><div class='sf-row'><div class='sf-item'><span class='sk'>碳水</span><b>74</b><i>/ 101–168 g</i><em class='mut'>还差 27g到下限</em></div><div class='sf-bar'><i class='sf-fill mut' style='width:30.4%'></i><i class='sf-tick' style='left:41.5%'></i><i class='sf-tick' style='left:69.0%'></i></div></div><div class='sf-row'><div class='sf-item'><span class='sk'>蛋白</span><b>23</b><i>/ 81–101 g</i><em class='mut'>还差 58g到下限</em></div><div class='sf-bar'><i class='sf-fill mut' style='width:15.7%'></i><i class='sf-tick' style='left:55.3%'></i><i class='sf-tick' style='left:69.0%'></i></div></div><div class='sf-row'><div class='sf-item'><span class='sk'>脂肪</span><b>4</b><i>/ 40–63 g</i><em class='mut'>偏低·别戒油</em></div><div class='sf-bar'><i class='sf-fill mut' style='width:4.4%'></i><i class='sf-tick' style='left:43.8%'></i><i class='sf-tick' style='left:69.0%'></i></div></div><div class='sf-row'><div class='sf-item'><span class='sk'>果糖</span><b>0</b><i>/ ≤50 g</i><em class='mut'>今天没吃水果</em></div><div class='sf-bar'><i class='sf-fill mut' style='width:0.0%'></i><i class='sf-tick' style='left:0.0%'></i><i class='sf-tick' style='left:69.0%'></i></div></div></div></div></div><div class='pstrip judge-strip'><b class='ptag'>这一餐</b>蛋白很够，脂肪很清淡，碳水适中——作为早餐完全没问题。</div><div class='pstrip next-strip'><b class='ptag'>下一餐</b>主食要吃够:还差 27g 碳水到下限(约 1 碗米饭 或 1 块帝王馍)；重点补蛋白:差 58g 到下限,一份瘦肉/鸡胸/虾(约一掌 ~70g)；脂肪空间充足,正常做饭就行；再配一份蔬菜。</div><div class='coach coach-strip'><span class='coach-tag'>松松点评</span>「早餐」一顿占了全天碳水 55%，休息日摊匀到三餐会更稳。</div><div class='dyn trim-wide'><div class='sub'>最近 7 天</div><div class='body-t'>平均热量约 976 kcal，蛋白 61 g，脂肪 39 g；高脂 1 天，有蔬果 5 天。</div></div></div></div><div class='bcell'><div class='card grow'><div class='mt'>活动日历 · 2026 年 7 月</div><table class='cal'><thead><tr><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th></tr></thead><tbody><tr><td class='e'></td><td class='e'></td><td class=''><span class='dn'>1</span><span class='chip c-o'>有氧+全身力量</span></td><td class=''><span class='dn'>2</span><span class='chip c-b'>散步</span></td><td class=''><span class='dn'>3</span><span class='chip c-o'>饭后散步</span><span class='chip c-o'>跑步机爬坡</span></td><td class=''><span class='dn'>4</span><span class='chip c-o'>逛街步行</span></td><td class=''><span class='dn'>5</span></td></tr><tr><td class=''><span class='dn'>6</span><span class='chip c-o'>跑步机爬坡</span></td><td class='td'><span class='dn'>7</span></td><td class=''><span class='dn'>8</span></td><td class=''><span class='dn'>9</span></td><td class=''><span class='dn'>10</span></td><td class=''><span class='dn'>11</span></td><td class=''><span class='dn'>12</span></td></tr><tr><td class=''><span class='dn'>13</span></td><td class=''><span class='dn'>14</span></td><td class=''><span class='dn'>15</span></td><td class=''><span class='dn'>16</span></td><td class=''><span class='dn'>17</span></td><td class=''><span class='dn'>18</span></td><td class=''><span class='dn'>19</span></td></tr><tr><td class=''><span class='dn'>20</span></td><td class=''><span class='dn'>21</span></td><td class=''><span class='dn'>22</span></td><td class=''><span class='dn'>23</span></td><td class=''><span class='dn'>24</span></td><td class=''><span class='dn'>25</span></td><td class=''><span class='dn'>26</span></td></tr><tr><td class=''><span class='dn'>27</span></td><td class=''><span class='dn'>28</span></td><td class=''><span class='dn'>29</span></td><td class=''><span class='dn'>30</span></td><td class=''><span class='dn'>31</span></td><td class='e'></td><td class='e'></td></tr></tbody></table><div class='coach trim-wide'><span class='coach-tag'>松松点评</span>本周训练 1 天。量不大，松松看来完全 OK。减脂期力量配重别降(配重守住=肌肉守住,大项配重掉=缺口太大或恢复不够的信号);有氧按体重来——≥80kg 靠吃就够、≤70kg 每周约 2 小时、70–80kg 看饿不饿,有氧每周别超 4 小时、放力量之后。</div></div><div class='card '><div class='mt'>松松小课堂</div><div class='tip-t'>看两周，别看单日</div><div class='tip-b'>单日体重涨跌大多是水和食糜——一斤脂肪要多吃约 4.5kg 米饭才长得出来。判断有没有瘦，看 7 日均和腰围，别被单天吓到。</div></div></div></div>
+
+<div class="foot">掉秤搭子 cut-buddy · 一笔一笔记出来的</div>
+</div>
+<script>
+const D={"weightDaily": [{"x": 1782864000000, "y": 68.9}, {"x": 1782950400000, "y": 68.25}, {"x": 1783036800000, "y": 68.05}, {"x": 1783123200000, "y": 67.65}, {"x": 1783209600000, "y": 67.15}, {"x": 1783296000000, "y": 68.0}, {"x": 1783382400000, "y": 67.3}], "ma7": [{"x": 1782864000000, "y": 68.9}, {"x": 1782950400000, "y": 68.58}, {"x": 1783036800000, "y": 68.4}, {"x": 1783123200000, "y": 68.21}, {"x": 1783209600000, "y": 68.0}, {"x": 1783296000000, "y": 68.0}, {"x": 1783382400000, "y": 67.9}], "target": 65, "minx": 1782864000000, "maxx": 1783382400000, "lo4w": 1782864000000, "lo4m": 1782864000000, "kcalDaily": [{"x": 1782864000000, "y": 939.6}, {"x": 1782950400000, "y": 1057.1}, {"x": 1783036800000, "y": 1005.1}, {"x": 1783123200000, "y": 1174.8}, {"x": 1783209600000, "y": 1049.8}, {"x": 1783296000000, "y": 1195.5}, {"x": 1783382400000, "y": 408.0}], "kcalAvg": 976, "proteinDaily": [{"x": 1782864000000, "y": 68.9}, {"x": 1782950400000, "y": 63.1}, {"x": 1783036800000, "y": 69.0}, {"x": 1783123200000, "y": 73.8}, {"x": 1783209600000, "y": 55.0}, {"x": 1783296000000, "y": 71.8}, {"x": 1783382400000, "y": 22.6}], "fatDaily": [{"x": 1782864000000, "y": 37.8}, {"x": 1782950400000, "y": 36.4}, {"x": 1783036800000, "y": 36.9}, {"x": 1783123200000, "y": 61.5}, {"x": 1783209600000, "y": 53.0}, {"x": 1783296000000, "y": 41.9}, {"x": 1783382400000, "y": 3.8}], "showDietChart": true, "bf": [], "showBody": false};
+Chart.defaults.font.family="'Nunito Sans','PingFang SC','Hiragino Sans GB',sans-serif";
+function fd(m){return new Date(m).toISOString().slice(5,10);}
+// 悬浮提示标题统一显示成"月-日"(否则会弹出原始时间戳那串大数字)
+Chart.defaults.plugins.tooltip.callbacks=Chart.defaults.plugins.tooltip.callbacks||{};
+Chart.defaults.plugins.tooltip.callbacks.title=function(its){return (its&&its.length)?fd(its[0].parsed.x):'';};
+const GRID='#EAF2EC',TICK='#74877B';
+const AX={type:'linear',ticks:{color:TICK,maxTicksLimit:6,font:{size:10},callback:v=>fd(v)},grid:{color:GRID,drawTicks:false},border:{display:false}};
+function yax(o){return Object.assign({ticks:{color:TICK,font:{size:10}},grid:{color:GRID,drawTicks:false},border:{display:false}},o||{});}
+const LEG={labels:{color:TICK,boxWidth:10,boxHeight:10,font:{size:10},usePointStyle:true,pointStyle:'circle'}};
+let wc;
+// 轻量悬浮交互:竖向辅助线 + 底部小日期 + 左上两个纯文字标签(7日均/每日)。不用大黑框、不挡曲线。
+const crosshairPlugin={id:'crosshair',
+  afterEvent(c,args){
+    const e=args.event;
+    if(e.type==='mousemove'){
+      // 按鼠标像素 x 找最近的"7日均"点(不用 index 模式——目标虚线只有2点会污染匹配、把指针永远拽到最左)
+      const mi=c.data.datasets.findIndex(d=>d.label==='7 日均');
+      const meta=mi<0?null:c.getDatasetMeta(mi); let best=null,bd=1e9;
+      if(meta) for(let k=0;k<meta.data.length;k++){const p=meta.data[k];if(!p)continue;const d=Math.abs(p.x-e.x);if(d<bd){bd=d;best=k;}}
+      const ca=c.chartArea, inside=e.x>=ca.left-6&&e.x<=ca.right+6&&e.y>=ca.top-6&&e.y<=ca.bottom+6;
+      const k=inside?best:null;
+      if(c.$ci!==k){c.$ci=k;args.changed=true;}
+    }else if(e.type==='mouseout'){ if(c.$ci!=null){c.$ci=null;args.changed=true;} }
+  },
+  afterDatasetsDraw(c){
+    const idx=c.$ci; if(idx==null) return;
+    const ctx=c.ctx, ca=c.chartArea;
+    const mi=c.data.datasets.findIndex(d=>d.label==='7 日均'); if(mi<0) return;
+    const md=c.data.datasets[mi].data[idx], pt=c.getDatasetMeta(mi).data[idx];
+    if(!md||!pt) return;
+    const x=pt.x;
+    ctx.save();
+    // 竖向辅助线
+    ctx.beginPath();ctx.moveTo(x,ca.top);ctx.lineTo(x,ca.bottom);
+    ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.strokeStyle='rgba(22,163,74,0.5)';ctx.stroke();ctx.setLineDash([]);
+    // 当前点高亮小圆点
+    ctx.beginPath();ctx.arc(x,pt.y,3.5,0,2*Math.PI);ctx.fillStyle='#16A34A';ctx.fill();
+    // 底部小药丸:日期 + 7日均(在坐标轴下方,永不挡曲线;只显示7日均,不显示单日)
+    const txt=fd(md.x)+'   '+md.y.toFixed(2)+' kg';
+    ctx.font="600 11px sans-serif";ctx.textAlign='center';ctx.textBaseline='top';
+    const tw=ctx.measureText(txt).width;
+    const px=Math.min(Math.max(x,ca.left+tw/2+8),ca.right-tw/2-8), py=ca.bottom+4;
+    ctx.fillStyle='#16A34A';
+    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(px-tw/2-7,py-1,tw+14,16,5);ctx.fill();}
+    ctx.fillStyle='#fff';ctx.fillText(txt,px,py+1);
+    ctx.restore();
+  }
+};
+function drawWeight(lo,hi){
+  const cfg={data:{datasets:[
+    {type:'line',label:'目标',data:[{x:D.minx,y:D.target},{x:D.maxx,y:D.target}],borderColor:'#C2DCC9',borderDash:[5,5],borderWidth:1,pointRadius:0},
+    {type:'scatter',label:'每日',data:D.weightDaily,pointRadius:2.2,pointBackgroundColor:'#D7EDDE',borderColor:'#C2DCC9'},
+    {type:'line',label:'7 日均',data:D.ma7,borderColor:'#16A34A',borderWidth:2.5,pointRadius:0,tension:.3,fill:true,backgroundColor:'rgba(22,163,74,0.07)'},
+  ]},options:{maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{legend:Object.assign({},LEG,{labels:Object.assign({},LEG.labels,{filter:i=>i.text!=='目标'})}),
+      tooltip:{enabled:false}},                                  // 关掉大黑框,改用上面的轻量自绘
+    scales:{x:Object.assign({},AX,{min:lo,max:hi}),y:yax({})}},plugins:[crosshairPlugin]};
+  if(wc)wc.destroy(); wc=new Chart(document.getElementById('cWeight'),cfg);
+}
+// 档位:近4周(默认)/近4月/全部;数据不够长的档位与「全部」重合,自动隐藏
+const ranges=[['近 4 周',D.lo4w],['近 4 月',D.lo4m]].filter(r=>r[1]>D.minx);
+ranges.push(['全部',D.minx]);
+drawWeight(ranges[0][1],D.maxx);
+const rd=document.getElementById('range');
+ranges.forEach(([t,lo],i)=>{const b=document.createElement('button');b.textContent=t;if(i===0)b.classList.add('on');
+  b.onclick=()=>{[...rd.children].forEach(c=>c.classList.remove('on'));b.classList.add('on');drawWeight(lo,D.maxx);};rd.appendChild(b);});
+// 饮食长期趋势已改为文字点评(v2.1),不再画 7 天小图
+if(D.showBody && D.bf.length){
+  new Chart(document.getElementById('cBody'),{data:{datasets:[
+    {type:'line',label:'体脂率 %',data:D.bf,borderColor:'#15803D',borderWidth:2.5,pointRadius:1.8,pointBackgroundColor:'#15803D',yAxisID:'y',tension:.3},
+  ]},options:{maintainAspectRatio:false,plugins:{legend:LEG},scales:{x:AX,
+    y:yax({position:'left',grace:'15%'})}}});
+}
+// 一屏自适应:宽屏下内容比窗口高就整体等比缩小,打开即见全部、零滚动(窄屏/手机不缩)
+function cbFit(){
+  if(innerWidth<1360){document.body.style.zoom='';return;}
+  document.body.style.zoom='';
+  var h=document.documentElement.scrollHeight;
+  var z=Math.max(0.72,Math.min(1,innerHeight/h));
+  document.body.style.zoom=(z<1)?z:'';
+}
+// 饮食卡内容超出行高时,先收「松松点评」、再收「下一餐」(渲染后实测高度,替代餐数估算)
+function fitDiet(){
+  var card=document.querySelector('.card.dietcard'); if(!card) return;
+  var coach=card.querySelector('.coach-strip'), next=card.querySelector('.next-strip');
+  if(coach)coach.style.display=''; if(next)next.style.display='';
+  if(innerWidth<1360) return;
+  if(card.scrollHeight>card.clientHeight+1 && coach) coach.style.display='none';
+  if(card.scrollHeight>card.clientHeight+1 && next) next.style.display='none';
+}
+function cbAll(){ document.body.style.zoom=''; fitDiet(); cbFit(); }
+addEventListener('resize',function(){clearTimeout(window.__cbft);window.__cbft=setTimeout(cbAll,120);});
+addEventListener('load',cbAll);
+cbAll();
+</script>
+
+</body></html>
